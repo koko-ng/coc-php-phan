@@ -1,11 +1,9 @@
 import * as path from 'path';
 import { spawn, execFile, ChildProcess } from 'mz/child_process';
-import * as vscode from 'vscode';
-import { DocumentFilter, RelativePattern } from 'vscode';
-import { LanguageClient, LanguageClientOptions, StreamInfo } from 'vscode-languageclient';
+import { DocumentFilter, LanguageClientOptions, StreamInfo, LanguageClient } from 'coc.nvim';
+import * as vscode from 'coc.nvim';
 import * as semver from 'semver';
 import * as net from 'net';
-import * as url from 'url';
 import * as fs from 'fs';
 
 async function showErrorMessage(message: string, ...items: string[]): Promise<string | undefined> {
@@ -185,7 +183,7 @@ function normalizeDirsToAnalyze(conf: string|string[]|undefined): string[] {
     if (!conf) {
         return [];
     }
-    if (conf instanceof Array) {
+    if (conf instanceof Array || Array.isArray(conf)) {
         return conf;
     }
     return [conf];
@@ -221,7 +219,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const unusedVariableDetection = conf.get<boolean>('unusedVariableDetection');
     const redundantConditionDetection = conf.get<boolean>('redundantConditionDetection');
     let analyzedFileExtensions: string[] = conf.get<string[]>('analyzedFileExtensions') || ['php'];
-    const useRelativePatterns = conf.get<boolean>('useRelativePatterns');
+    // const useRelativePatterns = conf.get<boolean>('useRelativePatterns');
 
     const isValidPHPVersion: boolean = await checkPHPVersion(context, phpExecutablePath);
     if (!isValidPHPVersion) {
@@ -379,29 +377,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }));
 
     const createClient = (dirToAnalyze: string): LanguageClient => {
-        let defaultDocumentSelector: DocumentFilter;
-        if (useRelativePatterns) {
-            // workaround for error TS2540: Cannot assign to 'pattern' because it is a read-only property.
-            // (maintains ability to check types)
-            defaultDocumentSelector = {
-                scheme: 'file',
-                language: 'php',
-                pattern: new RelativePattern(dirToAnalyze, '*')
-            };
-        } else {
-            defaultDocumentSelector = {
-                scheme: 'file',
-                language: 'php'
-            };
-        }
+        let defaultDocumentSelector: DocumentFilter = {
+            scheme: 'file',
+            language: 'php'
+        };
         const documentSelectors: DocumentFilter[] = [ defaultDocumentSelector ];
         if (analyzedFileExtensions.length > 0) {
-            let extPattern: RelativePattern|string;
-            if (useRelativePatterns) {
-                extPattern = new RelativePattern(dirToAnalyze, '**/*.{' + analyzedFileExtensions.join(',') + '}');
-            } else {
-                extPattern = '**/*.{' + analyzedFileExtensions.join(',') + '}';
-            }
+            let extPattern: string;
+            extPattern = '**/*.{' + analyzedFileExtensions.join(',') + '}';
             documentSelectors.push({scheme: 'file', pattern: extPattern});
         }
 
@@ -410,12 +393,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             // Register the server for php (and maybe HTML) documents
             // @ts-ignore DocumentSelector has conflicting type definitions
             documentSelector: documentSelectors,
-            uriConverters: {
+            /*uriConverters: {
                 // VS Code by default %-encodes even the colon after the drive letter
                 // NodeJS handles it much better
                 code2Protocol: uri => url.format(url.parse(uri.toString(true))),
                 protocol2Code: str => vscode.Uri.parse(str)
-            },
+            },*/
             synchronize: {
                 // Synchronize the setting section 'phan' to the server (TODO: server side support)
                 configurationSection: 'phan',
